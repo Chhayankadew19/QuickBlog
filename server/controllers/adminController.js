@@ -1,20 +1,47 @@
 import  jwt from "jsonwebtoken";
 import Blog from "../models/Blog.js";
 import Comment from "../models/Comment.js";
+import Admin from "../models/Admin.js";
+import bcrypt from "bcrypt";
 
 
-export const adminLogin = async (req,res) =>{
+// export const adminLogin = async (req,res) =>{
+//     try {
+//         const { email ,password } =req.body;
+//         if(email !== process.env.ADMIN_EMAIL || password!==process.env.ADMIN_PASSWORD ){
+//             return res.json({success:false ,message:"Invalid credentials"})
+//         }
+//         const token=jwt.sign({email},process.env.JWT_SECRET);
+//         res.json({success:true,token});
+//     } catch (error) {
+//         res.json({success:false,message:error.message});
+//     }
+// }
+
+
+export const adminSignup=async(req,res)=>{
     try {
-        const { email ,password } =req.body;
-        if(email !== process.env.ADMIN_EMAIL || password!==process.env.ADMIN_PASSWORD ){
-            return res.json({success:false ,message:"Invalid credentials"})
+        const {email,password}=req.body;
+        const existingAmin=await Admin.findOne({email});
+        if(existingAmin){
+            return res.json({success:false,message:"Admin already exits"});
         }
-        const token=jwt.sign({email},process.env.JWT_SECRET);
-        res.json({success:true,token});
+        const hashed=await bcrypt.hash(password,10);
+        const newAdmin=await Admin.create({email,password:hashed});
+        const token =jwt.sign({id:newAdmin._id},process.env.JWT_SECRET,{expiresIn:"7d",});
+        return res.status(201).json({
+            success:true,
+            message:"Registred Successfully",
+            token,
+            user:{
+                id:newAdmin._id,
+                email:newAdmin.email,
+            },
+        })
     } catch (error) {
-        res.json({success:false,message:error.message});
+        return res.json({success:false,message:error.message});
     }
-}
+};
 
 export const getAllBlogsAdmin= async (req,res)=>{
     try {
@@ -75,3 +102,28 @@ export const approveCommentById=async (req,res)=>{
     }
 }
 
+export const adminLogin=async(req,res)=>{
+    try{
+        const{email,password}=req.body;
+        const admin=await Admin.findOne({email});
+        if(!admin){
+            return res.json({success:false,message:"Admin not Found"});
+        }
+        const isMatch=await bcrypt.compare(password,admin.password);
+        if(!isMatch){
+            return res.json({success:false,message:"Invalid credentials"});
+        }
+        const token =jwt.sign({id:admin._id},process.env.JWT_SECRET,{expiresIn:"7d"});
+        res.json({
+            success:true,
+            token,
+            user:{
+                id:admin._id,
+                email:admin.email,
+            },
+        });
+    }catch(e){
+        res.json({success:false,message:error.message});
+    }
+
+};
